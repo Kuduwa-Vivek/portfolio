@@ -1087,7 +1087,7 @@
 
                     // Close mobile menu if open
                     const mobileMenu = document.querySelector('.mobile-menu');
-                    if (mobileMenu.classList.contains('hidden') === false) {
+                    if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
                         mobileMenu.classList.add('hidden');
                     }
                 }
@@ -1097,25 +1097,28 @@
         const toggleBtn = document.getElementById('toggle-projects');
         const moreProjects = document.getElementById('more-projects');
 
-        toggleBtn.addEventListener('click', function () {
-            const isHidden = moreProjects.classList.contains('hidden');
+        if (toggleBtn && moreProjects) {
+            toggleBtn.addEventListener('click', function () {
+                const isHidden = moreProjects.classList.contains('hidden');
 
-            if (isHidden) {
-                moreProjects.classList.remove('hidden');
-                toggleBtn.textContent = 'Show Less';
-            } else {
-                moreProjects.classList.add('hidden');
-                toggleBtn.textContent = 'View All Projects';
-            }
-        });
+                if (isHidden) {
+                    moreProjects.classList.remove('hidden');
+                    toggleBtn.textContent = 'Show Less';
+                } else {
+                    moreProjects.classList.add('hidden');
+                    toggleBtn.textContent = 'View All Projects';
+                }
+            });
+        }
 
-        // Mobile menu toggle
+        // Mobile menu toggle (runs after nav is in DOM; script is at end of body)
         const mobileMenuButton = document.querySelector('.mobile-menu-button');
         const mobileMenu = document.querySelector('.mobile-menu');
-
-        mobileMenuButton.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
+        if (mobileMenuButton && mobileMenu) {
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
 
         // Contact form submission
         const contactForm = document.getElementById('contact-form');
