@@ -66,7 +66,11 @@
         }
 
         .skill-bar {
-            transition: width 1.5s ease-in-out;
+            transition: width 1.35s cubic-bezier(0.33, 1, 0.68, 1);
+        }
+
+        .skill-bar.skill-bar--instant {
+            transition: none;
         }
 
         .card-hover:hover {
@@ -1143,32 +1147,63 @@
             });
         }
 
-        // Animate skill bars when they come into view
-        const animateSkillBars = () => {
-            const skillBars = document.querySelectorAll('.skill-bar');
+        // Skill bars: fill animation when #skills scrolls into view (and again after you scroll away)
+        (function initSkillBarAnimations() {
+            const section = document.getElementById('skills');
+            if (!section) return;
 
-            skillBars.forEach(bar => {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
+            const bars = section.querySelectorAll('.skill-bar');
+            if (!bars.length) return;
+
+            bars.forEach((bar) => {
+                const inline = bar.style.width;
+                const target = inline || getComputedStyle(bar).width;
+                if (target && target !== '0px') bar.dataset.targetWidth = target;
+            });
+
+            let fillActive = false;
+
+            const resetBarsInstant = () => {
+                bars.forEach((bar) => {
+                    bar.classList.add('skill-bar--instant');
+                    bar.style.width = '0';
+                    bar.offsetHeight;
+                    bar.classList.remove('skill-bar--instant');
+                });
+            };
+
+            const playFill = () => {
+                resetBarsInstant();
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        bars.forEach((bar, i) => {
+                            const target = bar.dataset.targetWidth;
+                            if (!target) return;
+                            window.setTimeout(() => {
+                                bar.style.width = target;
+                            }, 40 + i * 55);
+                        });
+                    });
+                });
+            };
+
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
                         if (entry.isIntersecting) {
-                            const width = bar.style.width;
-                            bar.style.width = '0';
-                            setTimeout(() => {
-                                bar.style.width = width;
-                            }, 100);
-                            observer.unobserve(entry.target);
+                            if (fillActive) return;
+                            fillActive = true;
+                            playFill();
+                        } else {
+                            fillActive = false;
                         }
                     });
-                }, { threshold: 0.5 });
+                },
+                { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+            );
 
-                observer.observe(bar);
-            });
-        };
-
-        // Initialize animations when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            animateSkillBars();
-        });
+            observer.observe(section);
+        })();
 
         // Handle all anchor tags with JavaScript
         document.querySelectorAll('a').forEach(anchor => {
