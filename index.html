@@ -66,7 +66,21 @@
         }
 
         .skill-bar {
-            transition: width 1.5s ease-in-out;
+            transition: width 1.35s cubic-bezier(0.33, 1, 0.68, 1);
+        }
+
+        .skill-bar.skill-bar--instant {
+            transition: none;
+        }
+
+        .skill-bar-track {
+            cursor: ew-resize;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .skill-bar-track.is-dragging {
+            touch-action: none;
         }
 
         .card-hover:hover {
@@ -1031,7 +1045,13 @@
                         <li><a href="#skills" class="hover:text-white transition">Skills</a></li>
                         <li><a href="#projects" class="hover:text-white transition">Projects</a></li>
                         <li><a href="#suggest" class="hover:text-white transition">Suggested</a></li>
-                        <li><a href="#contact" class="hover:text-white transition">Contact</a></li>
+                        <li>
+                            <a href="file/Vivek_Kuduwa.pdf" download="Vivek_Kuduwa_Resume.pdf"
+                                class="hover:text-white transition inline-flex items-center gap-2">
+                                <i class="fas fa-file-pdf text-red-400" aria-hidden="true"></i>
+                                <span>Download resume (PDF)</span>
+                            </a>
+                        </li>
                     </ul>
                 </div>
 
@@ -1087,7 +1107,7 @@
 
                     // Close mobile menu if open
                     const mobileMenu = document.querySelector('.mobile-menu');
-                    if (mobileMenu.classList.contains('hidden') === false) {
+                    if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
                         mobileMenu.classList.add('hidden');
                     }
                 }
@@ -1097,25 +1117,28 @@
         const toggleBtn = document.getElementById('toggle-projects');
         const moreProjects = document.getElementById('more-projects');
 
-        toggleBtn.addEventListener('click', function () {
-            const isHidden = moreProjects.classList.contains('hidden');
+        if (toggleBtn && moreProjects) {
+            toggleBtn.addEventListener('click', function () {
+                const isHidden = moreProjects.classList.contains('hidden');
 
-            if (isHidden) {
-                moreProjects.classList.remove('hidden');
-                toggleBtn.textContent = 'Show Less';
-            } else {
-                moreProjects.classList.add('hidden');
-                toggleBtn.textContent = 'View All Projects';
-            }
-        });
+                if (isHidden) {
+                    moreProjects.classList.remove('hidden');
+                    toggleBtn.textContent = 'Show Less';
+                } else {
+                    moreProjects.classList.add('hidden');
+                    toggleBtn.textContent = 'View All Projects';
+                }
+            });
+        }
 
-        // Mobile menu toggle
+        // Mobile menu toggle (runs after nav is in DOM; script is at end of body)
         const mobileMenuButton = document.querySelector('.mobile-menu-button');
         const mobileMenu = document.querySelector('.mobile-menu');
-
-        mobileMenuButton.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
+        if (mobileMenuButton && mobileMenu) {
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
 
         // Contact form submission
         const contactForm = document.getElementById('contact-form');
@@ -1140,45 +1163,162 @@
             });
         }
 
-        // Animate skill bars when they come into view
-        const animateSkillBars = () => {
-            const skillBars = document.querySelectorAll('.skill-bar');
+        // Skill bars: fill animation when #skills scrolls into view (and again after you scroll away)
+        (function initSkillBarAnimations() {
+            const section = document.getElementById('skills');
+            if (!section) return;
 
-            skillBars.forEach(bar => {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
+            const bars = section.querySelectorAll('.skill-bar');
+            if (!bars.length) return;
+
+            bars.forEach((bar) => {
+                const inline = bar.style.width;
+                const target = inline || getComputedStyle(bar).width;
+                if (target && target !== '0px') bar.dataset.targetWidth = target;
+            });
+
+            let fillActive = false;
+
+            const resetBarsInstant = () => {
+                bars.forEach((bar) => {
+                    bar.classList.add('skill-bar--instant');
+                    bar.style.width = '0';
+                    bar.offsetHeight;
+                    bar.classList.remove('skill-bar--instant');
+                });
+            };
+
+            const playFill = () => {
+                resetBarsInstant();
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        bars.forEach((bar, i) => {
+                            const target = bar.dataset.targetWidth;
+                            if (!target) return;
+                            window.setTimeout(() => {
+                                bar.style.width = target;
+                            }, 40 + i * 55);
+                        });
+                    });
+                });
+            };
+
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
                         if (entry.isIntersecting) {
-                            const width = bar.style.width;
-                            bar.style.width = '0';
-                            setTimeout(() => {
-                                bar.style.width = width;
-                            }, 100);
-                            observer.unobserve(entry.target);
+                            if (fillActive) return;
+                            fillActive = true;
+                            playFill();
+                        } else {
+                            fillActive = false;
                         }
                     });
-                }, { threshold: 0.5 });
+                },
+                { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+            );
 
-                observer.observe(bar);
+            observer.observe(section);
+        })();
+
+        // Skill bars: drag / scrub on the track, snap back to saved level on release
+        (function initSkillBarDrag() {
+            const section = document.getElementById('skills');
+            if (!section) return;
+
+            const pointerToPercent = (track, clientX) => {
+                const r = track.getBoundingClientRect();
+                const w = r.width || 1;
+                const x = Math.min(Math.max(0, clientX - r.left), w);
+                return (x / w) * 100;
+            };
+
+            section.querySelectorAll('.skill-bar').forEach((bar) => {
+                const track = bar.parentElement;
+                if (!track) return;
+
+                if (!bar.dataset.targetWidth) {
+                    const inline = bar.style.width;
+                    const target = inline || getComputedStyle(bar).width;
+                    if (target && target !== '0px') bar.dataset.targetWidth = target;
+                }
+
+                const row = track.previousElementSibling;
+                const valueEl =
+                    row && row.querySelector ? row.querySelector('span:last-of-type') : null;
+                if (valueEl && valueEl.textContent) {
+                    bar.dataset.labelText = valueEl.textContent.trim();
+                }
+
+                track.classList.add('skill-bar-track');
+
+                const applyPercent = (pct) => {
+                    bar.classList.add('skill-bar--instant');
+                    bar.style.width = `${pct}%`;
+                    if (valueEl) valueEl.textContent = `${Math.round(pct)}%`;
+                };
+
+                const snapBack = () => {
+                    track.classList.remove('is-dragging');
+                    bar.classList.remove('skill-bar--instant');
+                    const tw = bar.dataset.targetWidth;
+                    if (tw) bar.style.width = tw;
+                    if (valueEl && bar.dataset.labelText) valueEl.textContent = bar.dataset.labelText;
+                };
+
+                track.addEventListener('pointerdown', (e) => {
+                    if (e.pointerType === 'mouse' && e.button !== 0) return;
+                    e.preventDefault();
+                    track.classList.add('is-dragging');
+                    try {
+                        track.setPointerCapture(e.pointerId);
+                    } catch (_) {}
+                    applyPercent(pointerToPercent(track, e.clientX));
+                });
+
+                track.addEventListener('pointermove', (e) => {
+                    if (!track.hasPointerCapture(e.pointerId)) return;
+                    applyPercent(pointerToPercent(track, e.clientX));
+                });
+
+                const endDrag = (e) => {
+                    if (!track.hasPointerCapture(e.pointerId)) return;
+                    try {
+                        track.releasePointerCapture(e.pointerId);
+                    } catch (_) {}
+                    snapBack();
+                };
+
+                track.addEventListener('pointerup', endDrag);
+                track.addEventListener('pointercancel', endDrag);
             });
-        };
+        })();
 
-        // Initialize animations when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            animateSkillBars();
-        });
-
-        // Handle all anchor tags with JavaScript
-        document.querySelectorAll('a').forEach(anchor => {
+        // Demo placeholder: block only non-navigating links (allow #, http(s), mailto, tel, PDFs, download)
+        document.querySelectorAll('a').forEach((anchor) => {
             anchor.addEventListener('click', function (e) {
-                if (this.getAttribute('href') && this.getAttribute('href').startsWith('#')) {
-                    return; // Let smooth scrolling handle these
+                const href = this.getAttribute('href');
+                if (href && href.startsWith('#')) {
+                    return;
+                }
+                if (this.hasAttribute('download')) {
+                    return;
+                }
+                if (href && /\.pdf(\?|#|$)/i.test(href)) {
+                    return;
+                }
+                try {
+                    const u = new URL(href, window.location.href);
+                    if (['http:', 'https:', 'mailto:', 'tel:', 'file:'].includes(u.protocol)) {
+                        return;
+                    }
+                } catch (_) {
+                    return;
                 }
 
                 e.preventDefault();
-                if (this.getAttribute('href')) {
-                    console.log('Navigating to:', this.getAttribute('href'));
-                    // In a real application, you would use your routing logic here
-                    // window.location.href = this.getAttribute('href');
+                if (href) {
+                    console.log('Navigating to:', href);
                 }
             });
         });
