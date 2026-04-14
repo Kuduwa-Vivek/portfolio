@@ -73,6 +73,16 @@
             transition: none;
         }
 
+        .skill-bar-track {
+            cursor: ew-resize;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .skill-bar-track.is-dragging {
+            touch-action: none;
+        }
+
         .card-hover:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
@@ -1035,7 +1045,13 @@
                         <li><a href="#skills" class="hover:text-white transition">Skills</a></li>
                         <li><a href="#projects" class="hover:text-white transition">Projects</a></li>
                         <li><a href="#suggest" class="hover:text-white transition">Suggested</a></li>
-                        <li><a href="#contact" class="hover:text-white transition">Contact</a></li>
+                        <li>
+                            <a href="file/Vivek_Kuduwa.pdf" download="Vivek_Kuduwa_Resume.pdf"
+                                class="hover:text-white transition inline-flex items-center gap-2">
+                                <i class="fas fa-file-pdf text-red-400" aria-hidden="true"></i>
+                                <span>Download resume (PDF)</span>
+                            </a>
+                        </li>
                     </ul>
                 </div>
 
@@ -1205,18 +1221,104 @@
             observer.observe(section);
         })();
 
-        // Handle all anchor tags with JavaScript
-        document.querySelectorAll('a').forEach(anchor => {
+        // Skill bars: drag / scrub on the track, snap back to saved level on release
+        (function initSkillBarDrag() {
+            const section = document.getElementById('skills');
+            if (!section) return;
+
+            const pointerToPercent = (track, clientX) => {
+                const r = track.getBoundingClientRect();
+                const w = r.width || 1;
+                const x = Math.min(Math.max(0, clientX - r.left), w);
+                return (x / w) * 100;
+            };
+
+            section.querySelectorAll('.skill-bar').forEach((bar) => {
+                const track = bar.parentElement;
+                if (!track) return;
+
+                if (!bar.dataset.targetWidth) {
+                    const inline = bar.style.width;
+                    const target = inline || getComputedStyle(bar).width;
+                    if (target && target !== '0px') bar.dataset.targetWidth = target;
+                }
+
+                const row = track.previousElementSibling;
+                const valueEl =
+                    row && row.querySelector ? row.querySelector('span:last-of-type') : null;
+                if (valueEl && valueEl.textContent) {
+                    bar.dataset.labelText = valueEl.textContent.trim();
+                }
+
+                track.classList.add('skill-bar-track');
+
+                const applyPercent = (pct) => {
+                    bar.classList.add('skill-bar--instant');
+                    bar.style.width = `${pct}%`;
+                    if (valueEl) valueEl.textContent = `${Math.round(pct)}%`;
+                };
+
+                const snapBack = () => {
+                    track.classList.remove('is-dragging');
+                    bar.classList.remove('skill-bar--instant');
+                    const tw = bar.dataset.targetWidth;
+                    if (tw) bar.style.width = tw;
+                    if (valueEl && bar.dataset.labelText) valueEl.textContent = bar.dataset.labelText;
+                };
+
+                track.addEventListener('pointerdown', (e) => {
+                    if (e.pointerType === 'mouse' && e.button !== 0) return;
+                    e.preventDefault();
+                    track.classList.add('is-dragging');
+                    try {
+                        track.setPointerCapture(e.pointerId);
+                    } catch (_) {}
+                    applyPercent(pointerToPercent(track, e.clientX));
+                });
+
+                track.addEventListener('pointermove', (e) => {
+                    if (!track.hasPointerCapture(e.pointerId)) return;
+                    applyPercent(pointerToPercent(track, e.clientX));
+                });
+
+                const endDrag = (e) => {
+                    if (!track.hasPointerCapture(e.pointerId)) return;
+                    try {
+                        track.releasePointerCapture(e.pointerId);
+                    } catch (_) {}
+                    snapBack();
+                };
+
+                track.addEventListener('pointerup', endDrag);
+                track.addEventListener('pointercancel', endDrag);
+            });
+        })();
+
+        // Demo placeholder: block only non-navigating links (allow #, http(s), mailto, tel, PDFs, download)
+        document.querySelectorAll('a').forEach((anchor) => {
             anchor.addEventListener('click', function (e) {
-                if (this.getAttribute('href') && this.getAttribute('href').startsWith('#')) {
-                    return; // Let smooth scrolling handle these
+                const href = this.getAttribute('href');
+                if (href && href.startsWith('#')) {
+                    return;
+                }
+                if (this.hasAttribute('download')) {
+                    return;
+                }
+                if (href && /\.pdf(\?|#|$)/i.test(href)) {
+                    return;
+                }
+                try {
+                    const u = new URL(href, window.location.href);
+                    if (['http:', 'https:', 'mailto:', 'tel:', 'file:'].includes(u.protocol)) {
+                        return;
+                    }
+                } catch (_) {
+                    return;
                 }
 
                 e.preventDefault();
-                if (this.getAttribute('href')) {
-                    console.log('Navigating to:', this.getAttribute('href'));
-                    // In a real application, you would use your routing logic here
-                    // window.location.href = this.getAttribute('href');
+                if (href) {
+                    console.log('Navigating to:', href);
                 }
             });
         });
