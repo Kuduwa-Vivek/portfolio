@@ -87,6 +87,30 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
+
+        /* Discourage selecting/copying page content (not foolproof; forms stay editable) */
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body input,
+        body textarea,
+        body select,
+        body [contenteditable="true"],
+        body .allow-select {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            user-select: text;
+            -webkit-touch-callout: default;
+        }
+
+        img {
+            -webkit-user-drag: none;
+            user-select: none;
+        }
     </style>
 </head>
 
@@ -1088,8 +1112,31 @@
     <!-- JavaScript -->
     <script>
 
-
-
+        (function contentCopyGuard() {
+            const maySelect = (node) => {
+                if (!node) return false;
+                const el = node.nodeType === 1 ? node : node.parentElement;
+                return !!(el && el.closest && el.closest('input, textarea, select, [contenteditable="true"], .allow-select'));
+            };
+            document.addEventListener(
+                'selectstart',
+                (e) => {
+                    if (!maySelect(e.target)) e.preventDefault();
+                },
+                true
+            );
+            const blockClipboardIfNeeded = (e) => {
+                const sel = document.getSelection();
+                if (sel && sel.rangeCount && !sel.isCollapsed) {
+                    const r = sel.getRangeAt(0);
+                    if (!maySelect(r.startContainer) || !maySelect(r.endContainer)) e.preventDefault();
+                    return;
+                }
+                if (!maySelect(e.target)) e.preventDefault();
+            };
+            document.addEventListener('copy', blockClipboardIfNeeded);
+            document.addEventListener('cut', blockClipboardIfNeeded);
+        })();
 
         // Smooth scrolling for navigation links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
